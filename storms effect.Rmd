@@ -1,0 +1,174 @@
+---
+title: "storms_and_severe_weather"
+author: "Ahmed Hassan"
+date: "12/19/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# impact of Storms and other severe weather events on both public health and economic  
+## Synopsis  
+The basic goal of this report is to answer some basic questions about Storms and severe weather events such as,  
+1- which types of events are most harmful with respect to population health?  
+2- which types of events have the greatest economic consequences?  
+to answer this questions we obtained the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.  
+
+## Loading and Processing the Raw Data.  
+From the [Storm Data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2) we can explore and answer our mysterious questions.  
+There is also some documentation of the database available. Here you will find how some of the variables are constructed/defined.  
+* National Weather Service [Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)  
+* National Climatic Data Center Storm Events [FAQ](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf)  
+
+## load the relevant libraries, unzip and reading the data  
+```{r}
+# load the relevant libraries
+library(ggplot2)
+library(dplyr)
+library(plyr)
+library(lubridate)
+stormData <- read.csv("repdata_data_StormData.csv.bz2")
+```
+
+## Explore the data  
+```{r}
+str(stormData)
+```
+
+## Create a subset for relevant data.  
+The relevant elements for the analysis are the date (BGN_DATE), the type of event (EVTYPE), the health impact counter (FATALITIES and INJURIES), the monetary impact on crops and goods (PROPDMG and CROPDMG) as well as their corresponding exponents (PROPDMGEXP and CROPDMGEXP).
+```{r}
+## Create a subset for relevant data.
+relevantStormData <- select(stormData,  c("EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP"))
+# Explore the relevant data
+str(relevantStormData)
+```
+## Checking for missing values.  
+looping through the columns (with sapply) to get the number of NAs, because Missing values are a common problem with environmental data and so we check to se what proportion of the observations are missing
+```{r}
+sapply(relevantStormData, function(x) sum(is.na(x)))
+```
+## adjust Property Damage(PROPDMGEXP) and crop damage (CROPDMGEXP)
+transform the value of the variable PROPDMGEXP & CROPDMGEXP from character such as "K" to number  to be able to calculate the total property damage & total crop damage.  
+so We’re going to convert the exponents into corresponding factors: “”, “?”, “+”, “-”: 1 “0”: 1 “1”: 10 “2”: 100 “3”: 1.000 “4”: 10.000 “5”: 100.000 “6”: 1.000.000 “7”: 10.000.000 “8”: 100.000.000 “9”: 1.000.000.000 “H”: 100 “K”: 1.000 “M”: 1.000.000 *“B”: 1.000.000.000  
+```{r}
+x1 <- unique(relevantStormData$PROPDMGEXP)
+x2 <- c(10^3, 10^6, 1, 10^9, 10^6, 0,1,10^5, 10^6, 0, 10^4, 10^2, 10^3, 10^2, 10^7, 10^2, 0, 10, 10^8)
+y1 <- unique(relevantStormData$CROPDMGEXP)
+y2 <- c(1,10^6, 10^3, 10^6, 10^9, 0, 1, 10^3, 10^2)
+relevantStormData$PROPDMGEXP <- mapvalues(relevantStormData$PROPDMGEXP, from = x1, to = x2)
+relevantStormData$PROPDMGEXP <- as.numeric(as.character(relevantStormData$PROPDMGEXP))
+relevantStormData$CROPDMGEXP <- mapvalues(relevantStormData$CROPDMGEXP, from = y1, to = y2)
+relevantStormData$CROPDMGEXP <- as.numeric(as.character(relevantStormData$CROPDMGEXP))
+```
+
+calculate the total number of Property Damage(PROPDMGEXP) and crop damage (CROPDMGEXP)  
+```{r}
+relevantStormData$PROPDMGTOTAL <- (relevantStormData$PROPDMG * relevantStormData$PROPDMGEXP)/1000000000
+relevantStormData$CROPDMGTOTAL <- (relevantStormData$CROPDMG * relevantStormData$CROPDMGEXP)/1000000000
+``` 
+
+### Processing the data for analysis.  
+## Events for public health variables. 
+# Fatalities  
+```{r}
+aggFatalites <- aggregate(FATALITIES ~ EVTYPE, data = relevantStormData,  FUN="sum")
+dim(aggFatalites) 
+```
+# Screen the top 10 Weather events of fatalities  
+```{r}
+top10Fatalities <- aggFatalites[order(-aggFatalites$FATALITIES), ][1:10, ]
+top10Fatalities
+```
+Plot the histogram 
+```{r}
+fatalitiesPlot <- ggplot(data = top10Fatalities, aes(x = reorder(EVTYPE, FATALITIES), y = FATALITIES, color = EVTYPE)) + geom_bar(stat="identity",fill="white") + xlab("Event Type") +  ylab("Total number of fatalities") +  ggtitle("10 Fatalities Highest Events") 
+
+fatalitiesPlot + coord_flip()
+```
+# Injuries  
+```{r}
+aggInjuries <- aggregate(INJURIES ~ EVTYPE, data = relevantStormData,  FUN="sum")
+dim(aggInjuries) 
+```
+# Screen the top 10 Weather events of fatalities  
+```{r}
+top10Injuries <- aggInjuries[order(-aggInjuries$INJURIES), ][1:10, ]
+top10Injuries
+```
+# Plot the histogram  
+```{r}
+injuriesPlot <- ggplot(data = top10Injuries, aes(x = reorder(EVTYPE, INJURIES), y = INJURIES, color=EVTYPE)) + geom_bar(stat="identity",fill="white") + xlab("Event Type") +  ylab("Total number of injuries") +  ggtitle("10 Injuries Highest Events") 
+
+injuriesPlot + coord_flip()
+```
+## Property Damage  
+```{r}
+aggPdamage <- aggregate(PROPDMGTOTAL ~ EVTYPE, data = relevantStormData,  FUN="sum")
+dim(aggPdamage) 
+```
+Screen the top 10 Property damage Events  
+```{r}
+top10Pdamage <- aggPdamage[order(-aggPdamage$PROPDMGTOTAL), ][1:10, ]
+top10Pdamage
+```
+Plot the histogram  
+```{r}
+pdamagePlot <- ggplot(data = top10Pdamage, aes(x = reorder(EVTYPE, PROPDMGTOTAL), y = PROPDMGTOTAL, color = EVTYPE)) + geom_bar(stat = "identity",fill="white") + xlab("Event Type") +  ylab("Total damage in dollars") +  ggtitle("10 Highest Property Damages Events") 
+
+pdamagePlot + coord_flip()
+```
+## Crop Damage
+```{r}
+aggCdamage <- aggregate(CROPDMGTOTAL ~ EVTYPE, data = relevantStormData,  FUN="sum")
+dim(aggCdamage) 
+```
+# Screen the top 10 Property damage Events
+```{r}
+top10Cdamage <- aggCdamage[order(-aggCdamage$CROPDMGTOTAL), ][1:10, ]
+top10Pdamage
+```
+plot the histogram 
+```{r}
+cdamagePlot <- ggplot(data = top10Cdamage, aes(x = reorder(EVTYPE, CROPDMGTOTAL), y = CROPDMGTOTAL, color=EVTYPE)) + geom_bar(stat="identity",fill="white") + xlab("Event Type") +  ylab("Total crop in dollars") +  ggtitle("10 Highest Crop Damages Events") 
+
+cdamagePlot + coord_flip()
+```
+
+### Results   
+## Question 1  
+# The histogram shows that Tornados are the most harmful weather events for people’s health.  
+
+## Question 2  
+# The histogram shows that Floods cause the biggest Property damages. The histogram shows that DROUGHT cause the biggest Crop damages.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
